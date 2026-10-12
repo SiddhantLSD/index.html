@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Campaign spend calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16202a;--mute:#5d6b79;--line:#d9e0e7;--accent:#0b6b5c;--accent-ink:#fff;--bar:#bfe3da;--warn:#a4372c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10171d;--panel:#18222b;--ink:#e8eef3;--mute:#93a3b2;--line:#2a3743;--accent:#4cc3a9;--accent-ink:#06231d;--bar:#1f4a43;--warn:#ff8f80}}
+:root[data-theme="dark"]{--bg:#10171d;--panel:#18222b;--ink:#e8eef3;--mute:#93a3b2;--line:#2a3743;--accent:#4cc3a9;--accent-ink:#06231d;--bar:#1f4a43;--warn:#ff8f80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:28px 18px 56px}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.drop{display:block;border:1.5px dashed var(--line);border-radius:10px;padding:26px 16px;text-align:center;cursor:pointer;color:var(--mute)}
+.drop:hover,.drop:focus-within,.drop.over{border-color:var(--accent);color:var(--ink)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop b{color:var(--ink);font-weight:600}
+.fname{margin-top:8px;color:var(--ink);font-weight:500}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>label{flex:1 1 150px;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mute)}
+select,input[type=date],input[type=month],input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;min-width:0;width:100%}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+details summary{cursor:pointer;color:var(--mute);font-size:13px;margin-bottom:10px}
+.total{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.total .n{font-size:34px;font-weight:600;line-height:1.1}
+.total .l{color:var(--mute);font-size:13px}
+.btn{font:inherit;font-size:13px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:7px;padding:8px 14px;cursor:pointer;font-weight:500}
+.tw{overflow-x:auto;margin-top:14px}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{font-size:13px;font-weight:500;color:var(--mute)}
+td.c{max-width:280px;overflow-wrap:anywhere}
+.share{position:relative;min-width:90px}
+.share i{position:absolute;left:0;top:50%;height:60%;transform:translateY(-50%);background:var(--bar);border-radius:3px;z-index:0}
+.share span{position:relative;z-index:1}
+tfoot td{font-weight:600;border-bottom:0}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.live{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:14px}
+.tile{font:inherit;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink);cursor:pointer}
+.tile:hover{border-color:var(--accent)}
+.tile.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile .tl{display:block;color:var(--mute);font-size:13px}
+.tile .tv{display:block;font-size:18px;font-weight:600}
+.tile .tp{display:block;color:var(--mute);font-size:12px}
+th:nth-child(2),td:nth-child(2){text-align:left}
+.nocat th:nth-child(2),.nocat td:nth-child(2){display:none}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+h2{font-size:16px;font-weight:600;margin:0}
+.pd{margin-top:10px}
+.pd summary{color:var(--ink);margin-bottom:6px}
+td.tt{font-weight:600}
+.s2{color:var(--mute);font-size:12px}
+.tabc{display:inline-flex;gap:6px;align-items:center;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer}
+.msg{color:var(--warn);margin:10px 0 0;font-size:14px}
+.note{color:var(--mute);font-size:13px;margin:10px 0 0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Campaign spend calculator</h1>
+<p class="sub">Link your daily report once, pick a date range, and see total spend by campaign. Only spend is used. The file never leaves your computer.</p>
+
+<div class="panel">
+  <div class="live">
+    <button class="btn" id="link" type="button">Link live file</button>
+    <button class="btn ghost" id="linkDir" type="button" title="Use this if Windows says the file is in use">Link folder instead</button>
+    <select id="dirFile" hidden style="width:auto;max-width:260px"></select>
+    <button class="btn ghost" id="refresh" type="button" hidden>Refresh now</button>
+    <span class="note" id="stamp" style="margin:0"></span>
+  </div>
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv">
+    <div><b>Choose your Excel or CSV file</b> or drop it here</div>
+    <div class="fname" id="fname" hidden></div>
+  </label>
+  <p class="msg" id="err" hidden></p>
+</div>
+
+<div id="app" hidden>
+  <div class="panel" id="pp">
+    <div class="ph">
+      <div><h2>Spend by period</h2><p class="note" id="pnote" style="margin:2px 0 0"></p></div>
+      <div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap">
+        <label style="flex:0 0 auto">Current month<input type="month" id="mon"></label>
+        <button class="btn" id="pcopy" type="button">Copy summary</button>
+      </div>
+    </div>
+    <div class="tw"><table id="ptbl"><thead id="phead"></thead><tbody id="pbody"></tbody></table></div>
+    <div id="pdet"></div>
+  </div>
+  <div class="panel">
+    <div class="l" style="color:var(--mute);font-size:13px;margin-bottom:10px">Custom date range</div>
+    <div class="row">
+      <label>From<input type="date" id="from"></label>
+      <label>To<input type="date" id="to"></label>
+    </div>
+    <div class="chips" id="chips" aria-label="Quick month picker"></div>
+    <details style="margin-top:14px">
+      <summary>Columns detected (change if wrong)</summary>
+      <div class="row">
+        <label>Campaign<select id="cCamp"></select></label>
+        <label>Date<select id="cDate"></select></label>
+        <label>Spend<select id="cSpend"></select></label>
+        <label>Brand / Retail<select id="cCat"></select></label>
+        <label>Date order<select id="cDO"><option value="auto">Auto-detect</option><option value="dmy">Day first (31/12/2026)</option><option value="mdy">Month first (12/31/2026)</option></select></label>
+        <label>Currency<select id="cCur"></select></label>
+        <label>Insertion order<select id="cIO"></select></label>
+        <label>Line item<select id="cLI"></select></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>USD rows<select id="cMode"><option value="skip">Ignore (AED only)</option><option value="conv">Convert to AED</option></select></label>
+        <label id="rateL" hidden>USD to AED rate<input type="number" id="rate" value="3.6725" step="0.0001" min="0"></label>
+      </div>
+      <div id="sheetRow" style="margin-top:12px" hidden>
+        <div class="note" style="margin:0 0 6px">Tabs used (Display Raw and YT Raw are picked automatically)</div>
+        <div id="tabBox" class="chips" style="margin-top:0"></div>
+      </div>
+    </details>
+  </div>
+
+  <div class="panel" id="res">
+    <div class="total">
+      <div><div class="l" id="period"></div><div class="n" id="total"></div></div>
+      <button class="btn" id="copy">Copy table</button>
+    </div>
+    <div class="tiles" id="tiles" hidden></div>
+    <p class="note" id="skipped" hidden></p>
+    <div class="tw">
+      <table id="tbl">
+        <thead><tr><th>Campaign / insertion order / line item</th><th>Category</th><th>Spend</th><th>Share</th></tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+</main>
+
+<script>
+(function(){
+var $=function(id){return document.getElementById(id)};
+var catOf={}, catFilter="", ignN=0, othN=0, convN=0, dateMode="dmy", slashN=0, lastBuf=null, monNote="", pickNote="", tabWarn=[], usedTabs=[], sheets=[];
+var wb=null, rows=[], headers=[], parsed=[], skipped=0;
+var fmt=new Intl.NumberFormat("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function showErr(m){var e=$("err");e.textContent=m||"";e.hidden=!m}
+function iso(d){return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0")}
+function parseDate(v){
+  if(v==null||v==="")return null;
+  if(v instanceof Date)return iso(new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())));
+  if(typeof v==="number"){
+    if(v>20000&&v<80000)return iso(new Date(Math.round((v-25569)*864e5)));
+    if(v>=19000101&&v<=21001231){var q=String(Math.round(v));return q.slice(0,4)+"-"+q.slice(4,6)+"-"+q.slice(6,8)}
+    return null;
+  }
+  var s=String(v).trim(), m;
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0");
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))){
+    var y=m[3].length===2?"20"+m[3]:m[3];
+    if(dateMode==="mdy")return y+"-"+m[1].padStart(2,"0")+"-"+m[2].padStart(2,"0");
+    return y+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
+  }
+  if((m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,9})[-\/ ,]*(\d{2,4})$/))){
+    var mi=MON.findIndex(function(x){return x.toLowerCase()===m[2].slice(0,3).toLowerCase()});
+    if(mi>=0)return (m[3].length===2?"20"+m[3]:m[3])+"-"+pad(mi+1)+"-"+m[1].padStart(2,"0");
+  }
+  var t=Date.parse(s+" UTC"); if(!isNaN(t))return iso(new Date(t));
+  t=Date.parse(s); if(!isNaN(t)){var d=new Date(t);return iso(new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())))}
+  return null;
+}
+function parseNum(v){
+  if(typeof v==="number")return v;
+  if(v==null)return NaN;
+  var s=String(v).replace(/[^0-9.\-]/g,"");
+  return s===""||s==="-"?NaN:parseFloat(s);
+}
+function guess(re,exclude){
+  for(var i=0;i<headers.length;i++){ if(re.test(headers[i])&&!(exclude&&exclude.test(headers[i])))return i }
+  return -1;
+}
+function fillSel(sel,idx){
+  sel.innerHTML=headers.map(function(h,i){return '<option value="'+i+'">'+esc(h)+'</option>'}).join("");
+  if(idx>=0)sel.value=idx;
+}
+function norm(v){
+  if(v==null)return"";
+  var t=String(v).toLowerCase();
+  if(/\bretail/.test(t))return"Retail";
+  if(/\bbrand/.test(t)&&!/non[\s-]?brand/.test(t))return"Brand";
+  return"";
+}
+function normCur(v){
+  if(v==null)return"OTHER";
+  var t=String(v).toLowerCase();
+  if(/aed|dirham/.test(t))return"AED";
+  if(/usd|\$|dollar/.test(t))return"USD";
+  return"OTHER";
+}
+function fillCur(idx){
+  $("cCur").innerHTML='<option value="-1">None (all AED)</option>'+headers.map(function(h,i){return '<option value="'+i+'">'+esc(h)+'</option>'}).join("");
+  $("cCur").value=idx>=0?idx:-1;
+}
+function fillOpt(id,idx){
+  $(id).innerHTML='<option value="-1">None</option>'+headers.map(function(h,i){return '<option value="'+i+'">'+esc(h)+'</option>'}).join("");
+  $(id).value=idx>=0?idx:-1;
+}
+function disp(k){
+  var a=k.split("\u001f"),sub=[a[1],a[2]].filter(Boolean).join(" · ");
+  return esc(a[0])+(sub?'<br><span class="s2">'+esc(sub)+'</span>':"");
+}
+function fillCat(idx){
+  $("cCat").innerHTML='<option value="-1">None</option><option value="-2">Infer from campaign name</option>'+headers.map(function(h,i){return '<option value="'+i+'">'+esc(h)+'</option>'}).join("");
+  $("cCat").value=idx>=0?idx:-1;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function cur(id){var e=$(id);return e.options[e.selectedIndex]?e.options[e.selectedIndex].text:null}
+function restore(id,name){var e=$(id);for(var i=0;i<e.options.length;i++){if(e.options[i].text===name){e.value=e.options[i].value;return}}}
+function wantedTabs(names){
+  var m=names.filter(function(n){return /display.*raw|(^|[^a-z])(yt|youtube).*raw/i.test(n)});
+  return m.length?m:names.slice(0,1);
+}
+function selTabs(){return [].map.call(document.querySelectorAll("#tabBox input:checked"),function(x){return x.value})}
+function buildTabs(names,checked){
+  $("tabBox").innerHTML=names.map(function(n){return '<label class="tabc"><input type="checkbox" value="'+esc(n)+'"'+(checked.indexOf(n)>=0?" checked":"")+'> '+esc(n)+'</label>'}).join("");
+  $("sheetRow").hidden=names.length<2;
+}
+function readTab(name){
+  var arr=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+  var hi=-1;
+  for(var i=0;i<Math.min(arr.length,40)&&hi<0;i++){
+    var tx=(arr[i]||[]).map(function(c){return c==null?"":String(c).toLowerCase()});
+    var any=function(re){return tx.some(function(x){return re.test(x)})};
+    if(any(/campaign/)&&any(/date|day/)&&any(/spend|cost|amount/))hi=i;
+  }
+  if(hi<0){
+    hi=0;
+    for(var j=0;j<Math.min(arr.length,15);j++){
+      if((arr[j]||[]).filter(function(c){return c!=null&&c!==""}).length>=3){hi=j;break}
+    }
+  }
+  return{name:name,headers:(arr[hi]||[]).map(function(h,i){return h==null||h===""?"Column "+(i+1):String(h).trim()}),rows:arr.slice(hi+1)};
+}
+function loadTabs(keep){
+  var prev=keep?{c:cur("cCamp"),d:cur("cDate"),s:cur("cSpend"),t:cur("cCat"),u:cur("cCur"),io:cur("cIO"),li:cur("cLI")}:null;
+  sheets=selTabs().filter(function(n){return wb.Sheets[n]}).map(readTab);
+  if(!sheets.length){showErr("Select at least one tab.");return}
+  headers=sheets[0].headers;
+  fillSel($("cCamp"),guess(/campaign/i));
+  fillSel($("cDate"),guess(/date|day/i));
+  fillSel($("cSpend"),guess(/spend|cost|amount/i,/per|cpc|cpm|cpa|cpl|ctr/i));
+  var taken=[+$("cCamp").value,+$("cDate").value,+$("cSpend").value];
+  var gi=guess(/brand|retail|categor|type|segment|vertical|label|tag/i);
+  fillCat(taken.indexOf(gi)>=0?-1:gi);
+  fillOpt("cCur",/aed/i.test(cur("cSpend"))?-1:guess(/currenc|ccy/i));
+  fillOpt("cIO",guess(/insertion/i));
+  fillOpt("cLI",guess(/line\s*item/i));
+  if(prev){restore("cCur",prev.u);restore("cIO",prev.io);restore("cLI",prev.li);restore("cCat",prev.t);restore("cCamp",prev.c);restore("cDate",prev.d);restore("cSpend",prev.s)}
+  recompute(!keep);
+}
+var ROLE={cCamp:[/campaign/i],cDate:[/date|day/i],cSpend:[/spend|cost|amount/i,/per|cpc|cpm|cpa|cpl|ctr/i],cCat:[/brand|retail|categor|type|segment|vertical|label|tag/i],cCur:[/currenc|ccy/i],cIO:[/insertion/i],cLI:[/line\s*item/i]};
+// column index for a tab: first tab uses the dropdowns; other tabs match by the same header name, else by guess
+function colFor(sh,n,id){
+  var v=+$(id).value;
+  if(n===0||v<0)return v;
+  var nm=(cur(id)||"").toLowerCase(),k;
+  for(k=0;k<sh.headers.length;k++){if(sh.headers[k].toLowerCase()===nm)return k}
+  var r=ROLE[id];
+  for(k=0;k<sh.headers.length;k++){if(r[0].test(sh.headers[k])&&!(r[1]&&r[1].test(sh.headers[k])))return k}
+  return -1;
+}
+function recompute(resetDates){
+  var conv=$("cMode").value==="conv", rate=parseFloat($("rate").value)||0;
+  parsed=[];skipped=0;ignN=0;othN=0;convN=0;tabWarn=[];usedTabs=[];
+  // date order: auto-detect from values such as 25/09/2026 (day first) or 09/25/2026 (month first)
+  var de=0,me=0,rx=/^\s*(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})\s*$/;slashN=0;
+  sheets.forEach(function(sh,n){
+    var dc=colFor(sh,n,"cDate");if(dc<0)return;
+    for(var q=0;q<sh.rows.length;q++){
+      var v=sh.rows[q]&&sh.rows[q][dc];if(typeof v!=="string")continue;
+      var mm=v.match(rx);if(!mm)continue;
+      slashN++;if(+mm[1]>12)de++;else if(+mm[2]>12)me++;
+    }
+  });
+  var dm=$("cDO").value;
+  dateMode=dm==="auto"?(me>de?"mdy":"dmy"):dm;
+  var badD=0,badS=0,sD="",sS="",sC="",nRead=0,ui=-1;
+  sheets.forEach(function(sh,n){
+    var ci=colFor(sh,n,"cCamp"), di=colFor(sh,n,"cDate"), si=colFor(sh,n,"cSpend"), ti=colFor(sh,n,"cCat");
+    ui=colFor(sh,n,"cCur");
+    var ioi=colFor(sh,n,"cIO"), lii=colFor(sh,n,"cLI");
+    if(ci<0||di<0||si<0){tabWarn.push("Tab \""+sh.name+"\" skipped: couldn't find its "+(ci<0?"Campaign":di<0?"Date":"Spend")+" column.");return}
+    if(/aed/i.test(sh.headers[si]||""))ui=-1; // spend column already in AED
+    usedTabs.push(sh.name);
+    sh.rows.forEach(function(r){
+      if(!r||r.every(function(c){return c==null||c===""}))return;
+      nRead++;
+      var d=parseDate(r[di]), s=parseNum(r[si]);
+      if(!d){badD++;if(!sD)sD=String(r[di]==null?"(blank)":r[di])}
+      if(isNaN(s)){badS++;if(!sS)sS=String(r[si]==null?"(blank)":r[si])}
+      if(!d||isNaN(s)){skipped++;return}
+      var cu=ui>=0?normCur(r[ui]):"AED";
+      if(cu==="USD"){ if(conv){s=s*rate;convN++}else{ignN++;return} }
+      else if(cu!=="AED"){othN++;if(!sC)sC=String(r[ui]==null?"(blank)":r[ui]);return}
+      var cn=r[ci]==null||r[ci]===""?"(no name)":String(r[ci]).trim();
+      var io=ioi>=0&&r[ioi]!=null?String(r[ioi]).trim():"", li=lii>=0&&r[lii]!=null?String(r[lii]).trim():"";
+      var c=cn+"\u001f"+io+"\u001f"+li;
+      parsed.push({d:d,c:c,cn:cn,s:s,t:ti===-1?"":norm(ti===-2?cn:r[ti])});
+    });
+  });
+  // a campaign takes its most recent label and applies to all its dates
+  catOf={};var ld={},cl={};
+  parsed.forEach(function(p){
+    if(!p.t)return;
+    if(!ld[p.c]||p.d>=ld[p.c]){ld[p.c]=p.d;catOf[p.c]=p.t}
+    (cl[p.cn]||(cl[p.cn]={}))[p.t]=1;
+  });
+  parsed.forEach(function(p){
+    if(!catOf[p.c]){var st=cl[p.cn];if(st&&Object.keys(st).length===1)catOf[p.c]=Object.keys(st)[0]}
+    p.t=catOf[p.c]||"";
+  });
+  if(!parsed.length){
+    var em="No usable rows found ("+nRead+" data rows read). Columns seen: "+headers.slice(0,10).join(", ")+(headers.length>10?", ...":"")+". "
+      +"Date ["+cur("cDate")+"]: "+badD+" unreadable"+(sD?", e.g. "+sD:"")+". "
+      +"Spend ["+cur("cSpend")+"]: "+badS+" unreadable"+(sS?", e.g. "+sS:"")+". ";
+    if(ui>=0)em+="Currency ["+cur("cCur")+"]: "+othN+" rows not AED or USD"+(sC?", e.g. "+sC:"")+(ignN?"; "+ignN+" USD rows ignored":"")+". ";
+    em+=(pickNote?pickNote+" ":"")+tabWarn.join(" ")+" Fix the choices under Columns detected.";
+    showErr(em);$("res").hidden=true;$("pp").hidden=true;return}
+  $("pp").hidden=false;
+  showErr("");$("res").hidden=false;
+  var ds=parsed.map(function(p){return p.d}).sort();
+  if(resetDates){
+    var td=new Date(),ny=td.getFullYear()+"-"+pad(td.getMonth()+1),pk=td.getMonth()===0?(td.getFullYear()-1)+"-12":td.getFullYear()+"-"+pad(td.getMonth());
+    var has=function(k){return parsed.some(function(p){return p.d.slice(0,7)===k})};
+    monNote="";
+    if(!has(ny)&&!has(pk)){
+      var lm=ds[ds.length-1].slice(0,7);
+      $("mon").value=lm;
+      monNote="Current month was set to "+MON[+lm.slice(5)-1]+" "+lm.slice(0,4)+" because your file has no data for this month or last month.";
+    }else $("mon").value=ny;
+  }
+  if(resetDates){$("from").value=ds[0];$("to").value=ds[ds.length-1]}
+  $("from").min=$("to").min=ds[0];$("from").max=$("to").max=ds[ds.length-1];
+  buildChips(ds);
+  render();
+}
+function buildChips(ds){
+  var seen={},list=[];
+  ds.forEach(function(d){var k=d.slice(0,7);if(!seen[k]){seen[k]=1;list.push(k)}});
+  $("chips").innerHTML=list.map(function(k){
+    var p=k.split("-");
+    return '<button type="button" class="chip" data-m="'+k+'">'+MON[+p[1]-1]+" "+p[0]+"</button>";
+  }).join("");
+}
+function render(){
+  var f=$("from").value,t=$("to").value;
+  if(f&&t&&f>t){var x=f;f=t;t=x}
+  var hasCat=$("cCat").value!=="-1", flt=hasCat?catFilter:"";
+  var by={},tot=0,days={},ct={Brand:0,Retail:0,Unlabelled:0};
+  parsed.forEach(function(p){
+    if((f&&p.d<f)||(t&&p.d>t))return;
+    by[p.c]=(by[p.c]||0)+p.s;tot+=p.s;days[p.d]=1;
+    ct[p.t||"Unlabelled"]+=p.s;
+  });
+  var all=Object.keys(by).map(function(k){return{c:k,s:by[k],t:catOf[k]||"Unlabelled"}}).sort(function(a,b){return b.s-a.s});
+  var list=flt?all.filter(function(r){return r.t===flt}):all;
+  var ftot=list.reduce(function(a,r){return a+r.s},0);
+  var nd=Object.keys(days).length;
+  $("period").textContent="Total spend (AED), "+fdate(f)+" to "+fdate(t)+" ("+nd+" day"+(nd===1?"":"s")+" with data)";
+  $("total").textContent=fmt.format(tot);
+  $("tbl").classList.toggle("nocat",!hasCat);
+  var tl=$("tiles");tl.hidden=!hasCat;
+  if(hasCat){
+    tl.innerHTML=["","Brand","Retail","Unlabelled"].map(function(k){
+      var v=k===""?tot:ct[k];
+      return '<button type="button" class="tile'+(flt===k?" on":"")+'" data-cat="'+k+'"><span class="tl">'+(k||"All campaigns")+'</span><span class="tv">'+fmt.format(v)+'</span><span class="tp">'+(tot?(v/tot*100).toFixed(1):"0.0")+'% of total</span></button>';
+    }).join("");
+  }
+  $("rows").innerHTML=list.length?list.map(function(r){
+    var pc=ftot?r.s/ftot*100:0;
+    return '<tr><td class="c">'+disp(r.c)+'</td><td'+(r.t==="Unlabelled"?' style="color:var(--mute)"':'')+'>'+r.t+'</td><td>'+fmt.format(r.s)+'</td><td class="share"><i style="width:'+pc.toFixed(1)+'%"></i><span>'+pc.toFixed(1)+'%</span></td></tr>';
+  }).join(""):'<tr><td colspan="4" style="text-align:center;color:var(--mute)">No spend in this date range.</td></tr>';
+  $("foot").innerHTML=list.length?'<tr><td>Total'+(flt?' ('+flt+')':'')+', '+list.length+' lines</td><td></td><td>'+fmt.format(ftot)+'</td><td></td></tr>':"";
+  var sk=$("skipped"),msg=tabWarn.slice();
+  if(pickNote)msg.unshift(pickNote);
+  if(skipped)msg.push(skipped+" row(s) skipped: date or spend missing or unreadable (totals rows are usually among these).");
+  if(ignN)msg.push(ignN+" USD row(s) ignored (AED only).");
+  if(convN)msg.push(convN+" USD row(s) converted to AED at "+$("rate").value+".");
+  if(othN)msg.push(othN+" row(s) skipped: currency blank or not AED/USD.");
+  sk.hidden=!msg.length;sk.textContent=msg.join(" ");
+  document.querySelectorAll(".chip").forEach(function(b){
+    var m=b.dataset.m;b.classList.toggle("on",f===m+"-01"&&t===lastDay(m)||false);
+  });
+  render.last={list:list,tot:ftot,hasCat:hasCat};
+  renderPeriods();
+}
+function pad(n){return String(n).padStart(2,"0")}
+function sd(s){var p=s.split("-");return +p[2]+" "+MON[+p[1]-1]}
+function agg(f,t){
+  var by={},ct={Brand:0,Retail:0,Unlabelled:0},tot=0;
+  parsed.forEach(function(p){
+    if(p.d<f||p.d>t)return;
+    by[p.c]=(by[p.c]||0)+p.s;tot+=p.s;ct[p.t||"Unlabelled"]+=p.s;
+  });
+  return{by:by,ct:ct,tot:tot};
+}
+function renderPeriods(){
+  var ym=$("mon").value;
+  if(!ym||!parsed.length)return;
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),py=m===1?y-1:y,pm=m===1?12:m-1,P=py+"-"+pad(pm),C=ym;
+  var hasCat=$("cCat").value!=="-1";
+  var defs=[
+    {n:"Previous month, 25th to end",f:P+"-25",t:lastDay(P)},
+    {n:"Current month, 1st to 24th",f:C+"-01",t:C+"-24"},
+    {n:"Current month, 25th to end",f:C+"-25",t:lastDay(C)},
+    {n:"Previous month, full",f:P+"-01",t:lastDay(P)},
+    {n:"Current month, full",f:C+"-01",t:lastDay(C)}
+  ];
+  defs.forEach(function(d){d.a=agg(d.f,d.t);d.dates=sd(d.f)+" to "+sd(d.t)+" "+d.t.slice(0,4)});
+  var latest=parsed.reduce(function(a,p){return p.d>a?p.d:a},"");
+  $("pnote").textContent="Latest date in file: "+fdate(latest)+". Months are whole calendar months. Amounts in AED"+(ignN?" ("+ignN+" USD rows ignored)":"")+(convN?" (USD converted at "+$("rate").value+")":"")+".";
+  $("pnote").textContent+=" Tabs used: "+usedTabs.join(", ")+".";
+  var mn="",mx="",at=0;
+  parsed.forEach(function(p){if(!mn||p.d<mn)mn=p.d;if(p.d>mx)mx=p.d;at+=p.s});
+  $("pnote").textContent+=(slashN?" Dates like 10/05/2026 were read "+(dateMode==="mdy"?"month first":"day first")+($("cDO").value==="auto"?" (auto-detected)":"")+"; change Date order under Columns detected if that is wrong.":"")+" File has "+parsed.length+" rows from "+fdate(mn)+" to "+fdate(mx)+", adding up to "+fmt.format(at)+"."+(at===0?" The spend values add up to zero, so check the Spend column under Columns detected.":"")+(monNote?" "+monNote:"");
+  $("phead").innerHTML="<tr><th>Period</th><th>Dates</th>"+(hasCat?"<th>Brand</th><th>Retail</th><th>Unlabelled</th>":"")+"<th>Total</th></tr>";
+  $("pbody").innerHTML=defs.map(function(d){
+    return "<tr><td>"+d.n+"</td><td>"+d.dates+"</td>"+(hasCat?"<td>"+fmt.format(d.a.ct.Brand)+"</td><td>"+fmt.format(d.a.ct.Retail)+"</td><td>"+fmt.format(d.a.ct.Unlabelled)+"</td>":"")+'<td class="tt">'+fmt.format(d.a.tot)+"</td></tr>";
+  }).join("");
+  var box=$("pdet"),open=[].map.call(box.querySelectorAll("details"),function(x){return x.open});
+  box.innerHTML=defs.map(function(d){
+    var l=Object.keys(d.a.by).map(function(k){return{c:k,s:d.a.by[k],t:catOf[k]||"Unlabelled"}}).sort(function(a,b){return b.s-a.s});
+    var body=l.length?"<div class=\"tw\"><table><thead><tr><th>Campaign</th>"+(hasCat?"<th>Category</th>":"")+"<th>Spend</th></tr></thead><tbody>"+l.map(function(r){return '<tr><td class="c">'+disp(r.c)+"</td>"+(hasCat?"<td>"+r.t+"</td>":"")+"<td>"+fmt.format(r.s)+"</td></tr>"}).join("")+"</tbody></table></div>":'<p class="note">No spend in this period.</p>';
+    return '<details class="pd"><summary>Campaigns: '+d.n+" ("+l.length+")</summary>"+body+"</details>";
+  }).join("");
+  [].forEach.call(box.querySelectorAll("details"),function(x,i){x.open=!!open[i]});
+  renderPeriods.last={defs:defs,hasCat:hasCat};
+}
+function lastDay(m){var p=m.split("-");return m+"-"+String(new Date(Date.UTC(+p[0],+p[1],0)).getUTCDate()).padStart(2,"0")}
+function fdate(s){if(!s)return"";var p=s.split("-");return +p[2]+" "+MON[+p[1]-1]+" "+p[0]}
+
+function handle(file,keep){
+  if(!file)return;
+  showErr("");
+  var rd=new FileReader();
+  rd.onload=function(e){
+    $("stamp").textContent="Reading file…";
+    setTimeout(function(){try{
+      lastBuf=e.target.result;
+      var names=XLSX.read(lastBuf,{type:"array",bookSheets:true}).SheetNames;
+      var kept=(keep?selTabs():[]).filter(function(n){return names.indexOf(n)>=0});
+      var chosen=kept.length?kept:wantedTabs(names);
+      var hasD=names.some(function(n){return /display.*raw/i.test(n)}), hasY=names.some(function(n){return /(^|[^a-z])(yt|youtube).*raw/i.test(n)});
+      pickNote=(hasD&&hasY)?"":(!hasD&&!hasY?"Couldn't find tabs named Display Raw or YT Raw, so only the first tab was read. Tick the right tabs under Columns detected.":"Couldn't find a "+(hasD?"YT Raw":"Display Raw")+" tab. Check the tab name in your Excel.");
+      buildTabs(names,chosen);
+      wb=XLSX.read(lastBuf,{type:"array",sheets:chosen}); // only the chosen tabs are parsed
+      $("fname").textContent=file.name;$("fname").hidden=false;
+      $("app").hidden=false;
+      loadTabs(keep);
+      $("stamp").textContent=keep?"Updated "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
+    }catch(err){$("stamp").textContent="";showErr("Could not process the file: "+(err&&err.message?err.message:err))}},30);
+  };
+  rd.onerror=function(){showErr("Could not read that file.")};
+  rd.readAsArrayBuffer(file);
+}
+$("file").addEventListener("change",function(e){handle(e.target.files[0])});
+var dz=$("drop");
+["dragenter","dragover"].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.add("over")})});
+["dragleave","drop"].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.remove("over")})});
+dz.addEventListener("drop",function(e){handle(e.dataTransfer.files[0])});
+$("mon").value=new Date().getFullYear()+"-"+pad(new Date().getMonth()+1);
+$("mon").addEventListener("input",function(){monNote="";renderPeriods()});
+$("pcopy").addEventListener("click",function(){
+  var r=renderPeriods.last;if(!r)return;
+  var txt="Period\tDates\t"+(r.hasCat?"Brand\tRetail\tUnlabelled\t":"")+"Total\n"+r.defs.map(function(d){
+    return d.n+"\t"+d.dates+"\t"+(r.hasCat?d.a.ct.Brand.toFixed(2)+"\t"+d.a.ct.Retail.toFixed(2)+"\t"+d.a.ct.Unlabelled.toFixed(2)+"\t":"")+d.a.tot.toFixed(2);
+  }).join("\n");
+  var b=$("pcopy");
+  function done(ok){b.textContent=ok?"Copied":"Copy failed";setTimeout(function(){b.textContent="Copy summary"},1500)}
+  try{navigator.clipboard.writeText(txt).then(function(){done(true)},function(){done(false)})}catch(e){done(false)}
+});
+$("from").addEventListener("input",render);
+$("to").addEventListener("input",render);
+["cCamp","cDate","cSpend","cIO","cLI","cDO"].forEach(function(id){$(id).addEventListener("change",function(){recompute(true)})});
+["cCur","cMode","rate"].forEach(function(id){$(id).addEventListener(id==="rate"?"input":"change",function(){$("rateL").hidden=$("cMode").value!=="conv";recompute(false)})});
+$("cCat").addEventListener("change",function(){catFilter="";recompute(false)});
+$("tiles").addEventListener("click",function(e){var b=e.target.closest(".tile");if(!b)return;catFilter=b.dataset.cat;render()});
+$("tabBox").addEventListener("change",function(){
+  var sel=selTabs();
+  if(!sel.length){showErr("Select at least one tab.");return}
+  try{wb=XLSX.read(lastBuf,{type:"array",sheets:sel});loadTabs(true)}catch(e){showErr("Could not read those tabs.")}
+});
+$("chips").addEventListener("click",function(e){
+  var b=e.target.closest(".chip");if(!b)return;
+  var m=b.dataset.m;$("from").value=m+"-01";$("to").value=lastDay(m);render();
+});
+$("copy").addEventListener("click",function(){
+  var r=render.last;if(!r)return;
+  var txt="Campaign\tInsertion order\tLine item\t"+(r.hasCat?"Category\t":"")+"Spend\n"+r.list.map(function(x){return x.c.split("\u001f").join("\t")+"\t"+(r.hasCat?x.t+"\t":"")+x.s.toFixed(2)}).join("\n")+"\nTotal\t\t\t"+(r.hasCat?"\t":"")+r.tot.toFixed(2);
+  var b=$("copy");
+  function done(ok){b.textContent=ok?"Copied":"Copy failed";setTimeout(function(){b.textContent="Copy table"},1500)}
+  try{navigator.clipboard.writeText(txt).then(function(){done(true)},function(){done(false)})}catch(e){done(false)}
+});
+
+/* ---- live file link (Chrome / Edge) ---- */
+var fh=null, dirH=null, dirName="", hasFS=!!window.showOpenFilePicker;
+function src(){return dirH||fh}
+async function getF(){if(dirH){var h=await dirH.getFileHandle(dirName);return h.getFile()}return fh.getFile()}
+function idb(){return new Promise(function(res,rej){var r=indexedDB.open("spendapp",1);r.onupgradeneeded=function(){r.result.createObjectStore("h")};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})}
+function idbSet(v){return idb().then(function(d){return new Promise(function(res,rej){var t=d.transaction("h","readwrite");t.objectStore("h").put(v,"file");t.oncomplete=res;t.onerror=rej})})}
+function idbGet(){return idb().then(function(d){return new Promise(function(res,rej){var q=d.transaction("h").objectStore("h").get("file");q.onsuccess=function(){res(q.result)};q.onerror=rej})})}
+async function pull(interactive){
+  if(!src())return;
+  try{
+    var ok=(await src().queryPermission({mode:"read"}))==="granted";
+    if(!ok&&interactive)ok=(await src().requestPermission({mode:"read"}))==="granted";
+    if(!ok){$("stamp").textContent="Click Refresh now to reconnect to the file";return}
+    // read the bytes into memory quickly and let go of the file, so Excel is never blocked
+    var buf=null,err=null;
+    for(var a=0;a<4&&!buf;a++){
+      try{var f=await getF();buf=await f.arrayBuffer();f=null}
+      catch(e){err=e;await new Promise(function(r){setTimeout(r,800)})}
+    }
+    if(!buf){
+      if(interactive)showErr("Couldn't read the file right now ("+(err&&err.name||"error")+"). Excel may be saving it. Wait a few seconds and click Refresh now. If the file was moved or renamed, use Change live file.");
+      else $("stamp").textContent="File was busy, click Refresh now";
+      return;
+    }
+    handle(new File([buf],(dirH?dirName:fh&&fh.name)||"live.xlsx"),true);
+  }catch(e){
+    if(interactive)showErr("Couldn't read the file ("+(e&&e.name||"error")+"). Use Change live file to link it again.");
+    else $("stamp").textContent="Click Refresh now";
+  }
+}
+if(!hasFS){
+  $("link").hidden=true;$("linkDir").hidden=true;
+  $("stamp").textContent="Live linking needs Chrome or Edge. You can still choose a file below.";
+}else{
+  $("link").addEventListener("click",async function(){
+    try{
+      var r=await window.showOpenFilePicker({types:[{description:"Spreadsheet",accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx",".xlsm"],"application/vnd.ms-excel":[".xls"],"text/csv":[".csv"]}}]});
+      fh=r[0];dirH=null;dirName="";
+      try{await idbSet({k:"file",h:fh})}catch(e){}
+      $("refresh").hidden=false;$("link").textContent="Change live file";
+      showErr("");pull(true);
+    }catch(e){/* picker cancelled */}
+  });
+  function finishDir(dh,name){
+    dirH=dh;dirName=name;fh=null;
+    try{idbSet({k:"dir",dir:dh,name:name}).catch(function(){})}catch(e){}
+    $("dirFile").hidden=true;$("refresh").hidden=false;$("link").textContent="Link live file";
+    showErr("");pull(true);
+  }
+  $("linkDir").addEventListener("click",async function(){
+    try{
+      var dh=await window.showDirectoryPicker({mode:"read"});
+      var names=[];
+      for await(var en of dh.entries()){
+        if(en[1].kind==="file"&&/\.(xlsx|xlsm|xls|csv)$/i.test(en[0])&&en[0].indexOf("~$")!==0)names.push(en[0]);
+      }
+      if(!names.length){showErr("No Excel or CSV files found in that folder. Pick the folder that contains your spend file.");return}
+      if(names.length===1){finishDir(dh,names[0]);return}
+      var sel=$("dirFile");
+      sel.innerHTML='<option value="">Choose the file…</option>'+names.map(function(n){return '<option>'+esc(n)+'</option>'}).join("");
+      sel.hidden=false;
+      sel.onchange=function(){if(sel.value)finishDir(dh,sel.value)};
+    }catch(e){
+      if(e&&e.name!=="AbortError")showErr("Chrome won't allow that folder (it blocks top-level Desktop, Documents and Downloads). Put the Excel in a sub-folder, such as Documents\\Spends, and pick that folder.");
+    }
+  });
+  $("refresh").addEventListener("click",function(){pull(true)});
+  window.addEventListener("focus",function(){pull(false)});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)pull(false)});
+  (async function(){
+    try{
+      var h=await idbGet();
+      if(h&&h.k==="dir"){dirH=h.dir;dirName=h.name}
+      else if(h&&h.k==="file"){fh=h.h}
+      else if(h){fh=h}
+      if(src()){$("refresh").hidden=false;pull(false)}
+    }catch(e){}
+  })();
+}
+})();
+</script>
+</body>
+</html>
